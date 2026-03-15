@@ -1,0 +1,161 @@
+name: elibo-multiplication-game-ci-cd
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/elibo-multiplication-game
+  STACK_NAME: elibo-multiplication-game
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_ref: ${{ steps.image_meta.outputs.image_ref }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test -- --watch=false
+
+      - name: Build app
+        run: npm run build
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:main
+
+      - id: image_meta
+        name: Publish image metadata
+        run: |
+          echo "image_ref=${IMAGE_NAME}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+  deploy-portainer-dev:
+    runs-on: ubuntu-latest
+    needs: build-test-push
+    if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - id: precheck
+        name: Validate DEV Portainer credentials
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_DEV_URL || secrets.PORTAINER_URL }}
+          PORTAINER_API_KEY: ${{ secrets.PORTAINER_DEV_API_KEY || secrets.PORTAINER_API_KEY }}
+          PORTAINER_ENDPOINT_ID: ${{ secrets.PORTAINER_DEV_ENDPOINT_ID || secrets.PORTAINER_ENDPOINT_ID }}
+        run: |
+          missing=0
+          for var in PORTAINER_URL PORTAINER_API_KEY PORTAINER_ENDPOINT_ID; do
+            if [ -z "${!var}" ]; then
+              echo "Missing $var"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -eq 1 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "⚠️ DEV-Deploy übersprungen: Portainer-Secrets unvollständig"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: ensure_stack
+        name: Ensure Portainer stack exists
+        if: ${{ steps.precheck.outputs.skip != 'true' }}
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_DEV_URL || secrets.PORTAINER_URL }}
+          PORTAINER_API_KEY: ${{ secrets.PORTAINER_DEV_API_KEY || secrets.PORTAINER_API_KEY }}
+          PORTAINER_ENDPOINT_ID: ${{ secrets.PORTAINER_DEV_ENDPOINT_ID || secrets.PORTAINER_ENDPOINT_ID }}
+          ELIBO_MULTIPLICATION_GAME_EXTERNAL_PORT: ${{ secrets.ELIBO_MULTIPLICATION_GAME_EXTERNAL_PORT }}
+        run: |
+          node scripts/ensure-portainer-stack.mjs \
+            --stack-name "${STACK_NAME}" \
+            --external-port "${ELIBO_MULTIPLICATION_GAME_EXTERNAL_PORT:-8092}" \
+            --internal-port "80" \
+            --image-env-var "ELIBO_MULTIPLICATION_GAME_IMAGE" \
+            --image-default "${IMAGE_NAME}:main"
+
+      - id: deploy
+        name: Deploy image to Portainer
+        if: ${{ steps.precheck.outputs.skip != 'true' }}
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_DEV_URL || secrets.PORTAINER_URL }}
+          PORTAINER_API_KEY: ${{ secrets.PORTAINER_DEV_API_KEY || secrets.PORTAINER_API_KEY }}
+          PORTAINER_STACK_ID: ${{ steps.ensure_stack.outputs.stack_id }}
+          PORTAINER_ENDPOINT_ID: ${{ secrets.PORTAINER_DEV_ENDPOINT_ID || secrets.PORTAINER_ENDPOINT_ID }}
+          DEPLOY_IMAGE: ${{ needs.build-test-push.outputs.image_ref }}
+          GHCR_REGISTRY_USERNAME: ${{ github.repository_owner }}
+          GHCR_REGISTRY_TOKEN: ${{ github.token }}
+          GHCR_REGISTRY_NAME: ghcr-auto-elibo-multiplication-game
+        run: |
+          node scripts/portainer-stack.mjs deploy --stack-file "docker-compose.stack.yml" --image "${DEPLOY_IMAGE}"
+
+      - name: Wait until service is healthy
+        if: ${{ steps.precheck.outputs.skip != 'true' }}
+        continue-on-error: true
+        env:
+          HEALTHCHECK_URL: ${{ secrets.ELIBO_MULTIPLICATION_GAME_HEALTHCHECK_URL }}
+        run: |
+          if [ -n "${HEALTHCHECK_URL}" ]; then
+            node scripts/wait-health.mjs --url "${HEALTHCHECK_URL}" --timeout 300 --interval 8
+            exit 0
+          fi
+
+          echo "No healthcheck URL provided - verifying deployed image in Portainer stack"
+          node scripts/portainer-stack.mjs inspect
+
+      - name: Roll back on deployment failure
+        if: ${{ failure() && steps.precheck.outputs.skip != 'true' && steps.deploy.outputs.previous_image != '' }}
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_DEV_URL || secrets.PORTAINER_URL }}
+          PORTAINER_API_KEY: ${{ secrets.PORTAINER_DEV_API_KEY || secrets.PORTAINER_API_KEY }}
+          PORTAINER_STACK_ID: ${{ steps.ensure_stack.outputs.stack_id }}
+          PORTAINER_ENDPOINT_ID: ${{ secrets.PORTAINER_DEV_ENDPOINT_ID || secrets.PORTAINER_ENDPOINT_ID }}
+          DEPLOY_IMAGE: ${{ steps.deploy.outputs.previous_image }}
+          GHCR_REGISTRY_USERNAME: ${{ github.repository_owner }}
+          GHCR_REGISTRY_TOKEN: ${{ github.token }}
+          GHCR_REGISTRY_NAME: ghcr-auto-elibo-multiplication-game
+        run: |
+          echo "Rollback to ${DEPLOY_IMAGE}"
+          node scripts/portainer-stack.mjs deploy --stack-file "docker-compose.stack.yml" --image "${DEPLOY_IMAGE}"
