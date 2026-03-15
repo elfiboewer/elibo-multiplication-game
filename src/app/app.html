@@ -1,0 +1,108 @@
+<main class="game-shell">
+  <p-card styleClass="game-card">
+    <ng-template #title>🧮 {{ title }}</ng-template>
+    <ng-template #subtitle>
+      Trainiere spielerisch das kleine Einmaleins mit einer kinderfreundlichen
+      Lernrunde.
+    </ng-template>
+
+    <section class="settings" aria-label="Spieleinstellungen">
+      <div class="field">
+        <label for="maxFactor">Zahlen bis</label>
+        <p-inputNumber
+          inputId="maxFactor"
+          [ngModel]="maxFactor()"
+          (ngModelChange)="onMaxFactorChange($event)"
+          [min]="2"
+          [max]="20"
+          [useGrouping]="false"
+        ></p-inputNumber>
+      </div>
+
+      <div class="field">
+        <label for="totalRounds">Runden</label>
+        <p-inputNumber
+          inputId="totalRounds"
+          [ngModel]="totalRounds()"
+          (ngModelChange)="onRoundsChange($event)"
+          [min]="3"
+          [max]="20"
+          [useGrouping]="false"
+        ></p-inputNumber>
+      </div>
+
+      <p-button
+        label="Neu starten"
+        icon="pi pi-refresh"
+        severity="secondary"
+        (onClick)="startNewGame()"
+      ></p-button>
+    </section>
+
+    <section class="status-row" aria-label="Spielstatus">
+      <p-tag severity="info" [value]="'Runde ' + currentRound() + ' / ' + totalRounds()"></p-tag>
+      <p-tag severity="success" [value]="'Richtig: ' + correctAnswers()"></p-tag>
+      <p-tag severity="contrast" [value]="'Serie: ' + streak()"></p-tag>
+      <p-tag severity="warn" [value]="'Beste Serie: ' + bestStreak()"></p-tag>
+    </section>
+
+    <p-progressBar
+      [value]="progress()"
+      [showValue]="false"
+      aria-label="Spielfortschritt"
+    ></p-progressBar>
+
+    @if (!gameFinished()) {
+      <section class="question-block">
+        <p class="question-intro">Wie lautet diese Aufgabe?</p>
+        <h2 data-testid="question">
+          {{ currentQuestion().left }} × {{ currentQuestion().right }} = ?
+        </h2>
+
+        <div class="answer-row">
+          <p-inputNumber
+            inputId="playerAnswer"
+            [ngModel]="playerAnswer()"
+            (ngModelChange)="playerAnswer.set($event)"
+            [useGrouping]="false"
+            [showButtons]="true"
+            buttonLayout="horizontal"
+            decrementButtonIcon="pi pi-minus"
+            incrementButtonIcon="pi pi-plus"
+            [min]="0"
+            [inputStyle]="{ width: '7rem' }"
+            autocomplete="off"
+          ></p-inputNumber>
+
+          <p-button
+            label="Prüfen"
+            icon="pi pi-check"
+            (onClick)="submitAnswer()"
+          ></p-button>
+        </div>
+      </section>
+    } @else {
+      <section class="finish-block" data-testid="finish-state">
+        <h2>Geschafft! 🎉</h2>
+        <p>
+          Du hast {{ correctAnswers() }} von {{ totalRounds() }} Aufgaben richtig
+          gelöst.
+        </p>
+        <p>Trefferquote: {{ successRate() }}%</p>
+        <p-button
+          label="Nochmal spielen"
+          icon="pi pi-play"
+          (onClick)="startNewGame()"
+        ></p-button>
+      </section>
+    }
+
+    @if (feedback(); as result) {
+      <p-message
+        [severity]="result.severity"
+        [text]="result.text"
+        styleClass="feedback-message"
+      ></p-message>
+    }
+  </p-card>
+</main>
