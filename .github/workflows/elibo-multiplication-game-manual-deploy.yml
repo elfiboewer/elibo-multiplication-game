@@ -77,7 +77,7 @@ jobs:
         run: |
           node scripts/ensure-portainer-stack.mjs \
             --stack-name "${STACK_NAME}" \
-            --external-port "${ELIBO_MULTIPLICATION_GAME_EXTERNAL_PORT:-8092}" \
+            --external-port "${ELIBO_MULTIPLICATION_GAME_EXTERNAL_PORT:-8090}" \
             --internal-port "80" \
             --image-env-var "ELIBO_MULTIPLICATION_GAME_IMAGE" \
             --image-default "${IMAGE_NAME}:main"

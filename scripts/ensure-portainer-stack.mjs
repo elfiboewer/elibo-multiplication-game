@@ -5,7 +5,7 @@ import process from 'node:process';
 
 function usage() {
   console.log(`Usage:
-  node scripts/ensure-portainer-stack.mjs --stack-name <name> [--external-port 8092] [--internal-port 80]
+  node scripts/ensure-portainer-stack.mjs --stack-name <name> [--external-port 8090] [--internal-port 80]
                                        [--image-env-var ELIBO_MULTIPLICATION_GAME_IMAGE] [--image-default ghcr.io/<owner>/elibo-multiplication-game:main]
 
 Required environment:
@@ -18,7 +18,7 @@ Required environment:
 function parseArgs(argv) {
   const out = {
     stackName: '',
-    externalPort: '8092',
+    externalPort: '8090',
     internalPort: '80',
     imageEnvVar: 'ELIBO_MULTIPLICATION_GAME_IMAGE',
     imageDefault: 'ghcr.io/elfiboewer/elibo-multiplication-game:main',

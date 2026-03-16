@@ -23,7 +23,7 @@ Dieses Repo ist für den Standard-Flow **GitHub -> GHCR -> Portainer** vorbereit
 
 ### Optional
 
-- `ELIBO_MULTIPLICATION_GAME_EXTERNAL_PORT` (Default: `8092`)
+- `ELIBO_MULTIPLICATION_GAME_EXTERNAL_PORT` (Default: `8090`)
 - `ELIBO_MULTIPLICATION_GAME_HEALTHCHECK_URL`
 
 ## Laufzeit-Defaults
@@ -31,7 +31,7 @@ Dieses Repo ist für den Standard-Flow **GitHub -> GHCR -> Portainer** vorbereit
 - Stack Name: `elibo-multiplication-game`
 - Container Name: `elibo-multiplication-game`
 - Image: `ghcr.io/<owner>/elibo-multiplication-game:main`
-- Host-Port: `8092` -> Container-Port `80`
+- Host-Port: `8090` -> Container-Port `80`
 - Health Endpoint (Container intern): `/health`
 
 ## Trigger

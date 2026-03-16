@@ -51,3 +51,5 @@ Relevante Dateien:
 - `nginx.conf`
 - `docker-compose.stack.yml`
 - `DEPLOYMENT_AUTOMATION_SETUP.md`
+
+Default-Port-Mapping im Stack: **Host `8090` -> Container `80`**.
