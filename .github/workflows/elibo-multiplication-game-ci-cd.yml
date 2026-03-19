@@ -65,7 +65,7 @@ jobs:
           echo "image_ref=${IMAGE_NAME}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
   deploy-portainer-dev:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, openclaw]
     needs: build-test-push
     if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
 
