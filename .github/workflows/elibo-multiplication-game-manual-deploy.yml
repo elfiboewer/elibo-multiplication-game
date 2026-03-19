@@ -57,6 +57,13 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Abort when DEV Portainer secrets are missing
+        if: ${{ steps.precheck.outputs.skip == 'true' }}
+        run: |
+          echo "❌ Manual deploy abgebrochen: Portainer-Secrets fehlen."
+          echo "Bitte setze PORTAINER_DEV_URL|PORTAINER_URL, PORTAINER_DEV_API_KEY|PORTAINER_API_KEY und PORTAINER_DEV_ENDPOINT_ID|PORTAINER_ENDPOINT_ID."
+          exit 1
+
       - id: resolve_image
         name: Resolve target image
         run: |
@@ -97,11 +104,16 @@ jobs:
         run: |
           node scripts/portainer-stack.mjs deploy --stack-file "docker-compose.stack.yml" --image "${DEPLOY_IMAGE}"
 
-      - name: Wait until service is healthy
+      - name: Verify deployment health
         if: ${{ steps.precheck.outputs.skip != 'true' }}
-        continue-on-error: true
         env:
           RUN_HEALTHCHECK: ${{ inputs.run_healthcheck }}
+          PORTAINER_URL: ${{ secrets.PORTAINER_DEV_URL || secrets.PORTAINER_URL }}
+          PORTAINER_API_KEY: ${{ secrets.PORTAINER_DEV_API_KEY || secrets.PORTAINER_API_KEY }}
+          PORTAINER_STACK_ID: ${{ steps.ensure_stack.outputs.stack_id }}
+          PORTAINER_ENDPOINT_ID: ${{ secrets.PORTAINER_DEV_ENDPOINT_ID || secrets.PORTAINER_ENDPOINT_ID }}
+          PORTAINER_STACK_NAME: ${{ env.STACK_NAME }}
+          DEPLOY_IMAGE: ${{ steps.resolve_image.outputs.image_ref }}
           HEALTHCHECK_URL: ${{ secrets.ELIBO_MULTIPLICATION_GAME_HEALTHCHECK_URL }}
         run: |
           if [ "${RUN_HEALTHCHECK}" != "true" ]; then
@@ -109,13 +121,15 @@ jobs:
             exit 0
           fi
 
-          if [ -n "${HEALTHCHECK_URL}" ]; then
-            node scripts/wait-health.mjs --url "${HEALTHCHECK_URL}" --timeout 300 --interval 8
-            exit 0
-          fi
+          echo "Verify runtime container state via Portainer API"
+          node scripts/portainer-stack.mjs wait-healthy --image "${DEPLOY_IMAGE}" --timeout 300 --interval 8
 
-          echo "No healthcheck URL provided - verifying deployed image in Portainer stack"
-          node scripts/portainer-stack.mjs inspect
+          if [ -n "${HEALTHCHECK_URL}" ]; then
+            echo "Verify external health endpoint"
+            node scripts/wait-health.mjs --url "${HEALTHCHECK_URL}" --timeout 300 --interval 8
+          else
+            echo "No external healthcheck URL provided - Portainer health verification completed"
+          fi
 
       - name: Roll back on deployment failure
         if: ${{ failure() && steps.precheck.outputs.skip != 'true' && steps.deploy.outputs.previous_image != '' }}

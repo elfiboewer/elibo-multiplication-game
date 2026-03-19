@@ -10,7 +10,7 @@ Dieses Repo ist für den Standard-Flow **GitHub -> GHCR -> Portainer** vorbereit
 - Portainer Stack Definition: `docker-compose.stack.yml`
 - Helper Scripts:
   - `scripts/ensure-portainer-stack.mjs`
-  - `scripts/portainer-stack.mjs`
+  - `scripts/portainer-stack.mjs` *(Commands: `inspect`, `deploy`, `wait-healthy`)*
   - `scripts/wait-health.mjs`
 
 ## Benötigte GitHub Secrets
@@ -24,7 +24,7 @@ Dieses Repo ist für den Standard-Flow **GitHub -> GHCR -> Portainer** vorbereit
 ### Optional
 
 - `ELIBO_MULTIPLICATION_GAME_EXTERNAL_PORT` (Default: `8090`)
-- `ELIBO_MULTIPLICATION_GAME_HEALTHCHECK_URL`
+- `ELIBO_MULTIPLICATION_GAME_HEALTHCHECK_URL` *(externer HTTP-Check zusätzlich zum Portainer-Healthcheck)*
 
 ## Laufzeit-Defaults
 
@@ -38,6 +38,13 @@ Dieses Repo ist für den Standard-Flow **GitHub -> GHCR -> Portainer** vorbereit
 
 - **Auto Deploy:** Push auf `main`/`master`
 - **Manuell:** GitHub Actions -> `elibo-multiplication-game-manual-deploy`
+  - Bricht aktiv ab, wenn die Pflicht-Secrets fehlen.
+
+## Verifikation nach Deploy
+
+1. **Pflicht:** Runtime-Health direkt über Portainer API (`portainer-stack.mjs wait-healthy`)
+2. **Optional:** externer HTTP-Healthcheck via `ELIBO_MULTIPLICATION_GAME_HEALTHCHECK_URL`
+3. Bei Fehlern greift Rollback auf das zuletzt bekannte Image (`previous_image`)
 
 ## Lokale Checks vor Push
 

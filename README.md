@@ -44,6 +44,8 @@ Der Standard-Deploy ist vorbereitet:
 - Push auf `main`/`master` startet `.github/workflows/elibo-multiplication-game-ci-cd.yml`
 - Build + Tests + Docker Push nach GHCR
 - Automatischer Deploy nach Portainer (wenn DEV-Secrets gesetzt sind)
+- Deployment-Verifikation über Portainer-Container-Health (Pflicht) + optionalen externen Healthcheck (`ELIBO_MULTIPLICATION_GAME_HEALTHCHECK_URL`)
+- Manueller Deploy (`elibo-multiplication-game-manual-deploy`) bricht mit klarer Fehlermeldung ab, wenn die Portainer-Secrets fehlen
 
 Relevante Dateien:
 
